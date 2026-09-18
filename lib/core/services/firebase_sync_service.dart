@@ -19,9 +19,16 @@ class FirebaseSyncService {
   static Future<bool> initialize() async {
     if (_isInitialized) return true;
     try {
+      final options = DefaultFirebaseOptions.currentPlatform;
+      // Guard against placeholder keys to prevent native iOS FIRInstallations validation crash
+      if (options.apiKey.startsWith('YOUR_') || options.apiKey.length != 39 || !options.apiKey.startsWith('A')) {
+        _isInitialized = false;
+        return false;
+      }
+
       if (Firebase.apps.isEmpty) {
         await Firebase.initializeApp(
-          options: DefaultFirebaseOptions.currentPlatform,
+          options: options,
         );
       }
       _isInitialized = true;
