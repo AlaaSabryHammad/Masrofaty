@@ -38,18 +38,11 @@ class _EmailOtpDialogState extends State<EmailOtpDialog> {
   bool _isVerifying = false;
   bool _isResending = false;
   String? _errorMessage;
-  String? _devPreviewCode;
 
   @override
   void initState() {
     super.initState();
     _startTimer();
-    _fetchDevPreviewCode();
-  }
-
-  void _fetchDevPreviewCode() {
-    final auth = context.read<AuthProvider>();
-    _devPreviewCode = auth.emailOtpService.getActiveCodeForTesting(widget.email);
   }
 
   void _startTimer() {
@@ -106,7 +99,6 @@ class _EmailOtpDialogState extends State<EmailOtpDialog> {
     setState(() {
       _isResending = false;
       if (result.isSuccess) {
-        _devPreviewCode = result.code;
         _startTimer();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -118,21 +110,6 @@ class _EmailOtpDialogState extends State<EmailOtpDialog> {
         _errorMessage = result.errorMessage ?? 'تعذر إرسال الرمز، يرجى المحاولة لاحقاً.';
       }
     });
-  }
-
-  void _autoFillDevCode() {
-    if (_devPreviewCode != null && _devPreviewCode!.length == 6) {
-      for (int i = 0; i < 6; i++) {
-        _controllers[i].text = _devPreviewCode![i];
-      }
-      for (var f in _focusNodes) {
-        f.unfocus();
-      }
-      setState(() {
-        _errorMessage = null;
-      });
-      _verifyAndRegister();
-    }
   }
 
   Future<void> _verifyAndRegister() async {
@@ -412,59 +389,41 @@ class _EmailOtpDialogState extends State<EmailOtpDialog> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
 
-            // Dev / Quick Testing Helper (allows instant verification on device)
-            if (_devPreviewCode != null)
-              Material(
-                color: Colors.transparent,
-                child: InkWell(
-                  onTap: _autoFillDevCode,
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(Icons.mark_email_unread_rounded, size: 20, color: AppColors.primary),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'كود التحقق: $_devPreviewCode',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'تعبئة وتأكيد',
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+            // Helpful note to check inbox/spam
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: isDark ? AppColors.darkBorder : AppColors.lightBorder,
                 ),
               ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'يرجى تفقد صندوق الوارد في بريدك (أو مجلد الرسائل غير المرغوب فيها Spam).',
+                      style: TextStyle(
+                        fontSize: 11.5,
+                        color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
 
-            // Resend Timer Row
+            const SizedBox(height: 16),
             Center(
               child: _resendCountdown > 0
                   ? Row(

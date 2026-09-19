@@ -163,6 +163,7 @@ class GoalProvider extends ChangeNotifier {
   Future<void> deleteGoal(String id) async {
     _goals.removeWhere((g) => g.id == id);
     await _saveGoals();
+    await _storage.deleteSingleGoal(id);
     notifyListeners();
   }
 }

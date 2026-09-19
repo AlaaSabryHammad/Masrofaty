@@ -83,6 +83,7 @@ class UserProfileModel {
         : 'مستثمر طموح 🚀';
     final phone = (user?.phone as String?) ?? '';
     final joinDate = (user?.createdAt as DateTime?) ?? DateTime.now();
+    final photoUrl = (user?.photoUrl as String?);
 
     return UserProfileModel(
       name: name,
@@ -91,7 +92,7 @@ class UserProfileModel {
       phone: phone,
       monthlyBudget: 5000.0,
       bio: 'الادخار المنتظم هو أولى خطوات الحرية المالية',
-      avatarPath: 'assets/images/default_avatar.png',
+      avatarPath: (photoUrl != null && photoUrl.isNotEmpty) ? photoUrl : 'assets/images/default_avatar.png',
       joinDate: joinDate,
       tier: 'عضو ذهبي ✨',
     );

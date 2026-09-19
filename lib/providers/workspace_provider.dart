@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:uuid/uuid.dart';
 import '../core/services/storage_service.dart';
 import '../models/workspace_model.dart';
@@ -15,6 +16,21 @@ class WorkspaceProvider extends ChangeNotifier {
   WorkspaceModel? _activeWorkspace;
   SaaSPlanModel _currentPlan = SaaSPlanModel.starter();
   bool _isLoading = false;
+
+  void _safeNotifyListeners() {
+    if (!hasListeners) return;
+    final binding = WidgetsBinding.instance;
+    if (binding.schedulerPhase == SchedulerPhase.persistentCallbacks ||
+        binding.schedulerPhase == SchedulerPhase.midFrameMicrotasks) {
+      binding.addPostFrameCallback((_) {
+        if (hasListeners) {
+          notifyListeners();
+        }
+      });
+    } else {
+      notifyListeners();
+    }
+  }
 
   WorkspaceProvider(this._storage, [this._onWorkspaceSwitched]) {
     final uid = _storage.currentUserId;
@@ -42,8 +58,6 @@ class WorkspaceProvider extends ChangeNotifier {
 
   void initForUser(String userId) {
     _currentUserId = userId;
-    _isLoading = true;
-    notifyListeners();
 
     _workspaces = _storage.loadWorkspaces(userId);
     _currentPlan = _storage.loadSaaSPlan(userId);
@@ -61,7 +75,7 @@ class WorkspaceProvider extends ChangeNotifier {
 
     _storage.setCurrentWorkspaceId(_activeWorkspace?.id);
     _isLoading = false;
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   Future<void> switchWorkspace(String workspaceId) async {
@@ -80,7 +94,7 @@ class WorkspaceProvider extends ChangeNotifier {
       await _storage.saveCurrencySymbol(target.currencySymbol);
 
       _onWorkspaceSwitched?.call();
-      notifyListeners();
+      _safeNotifyListeners();
     } catch (_) {}
   }
 
@@ -140,8 +154,18 @@ class WorkspaceProvider extends ChangeNotifier {
       if (_currentUserId != null) {
         await _storage.saveWorkspaces(_currentUserId!, _workspaces);
       }
-      notifyListeners();
+      _safeNotifyListeners();
     }
+  }
+
+  Future<void> updateActiveWorkspaceCurrency(String currencyCode, String currencySymbol) async {
+    if (_activeWorkspace == null) return;
+    final updated = _activeWorkspace!.copyWith(
+      currency: currencyCode,
+      currencySymbol: currencySymbol,
+    );
+    await updateWorkspace(updated);
+    await _storage.saveCurrencySymbol(currencySymbol);
   }
 
   Future<bool> deleteWorkspace(String workspaceId) async {
@@ -162,7 +186,7 @@ class WorkspaceProvider extends ChangeNotifier {
     if (_currentUserId != null) {
       await _storage.saveWorkspaces(_currentUserId!, _workspaces);
     }
-    notifyListeners();
+    _safeNotifyListeners();
     return true;
   }
 
@@ -177,7 +201,7 @@ class WorkspaceProvider extends ChangeNotifier {
     if (_currentUserId != null) {
       await _storage.saveSaaSPlan(_currentUserId!, newPlan);
     }
-    notifyListeners();
+    _safeNotifyListeners();
   }
 
   List<WalletModel> _generateDefaultWalletsForType(WorkspaceType type, String workspaceId) {

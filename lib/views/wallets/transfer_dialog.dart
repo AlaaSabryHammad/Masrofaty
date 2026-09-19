@@ -83,7 +83,20 @@ class _TransferDialogState extends State<TransferDialog> {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final currency = context.watch<ThemeProvider>().currencySymbol;
-    final wallets = context.watch<FinanceProvider>().wallets;
+    final rawWallets = context.watch<FinanceProvider>().wallets;
+    final wallets = <WalletModel>[];
+    final seen = <String>{};
+    for (final w in rawWallets) {
+      if (seen.add(w.id)) {
+        wallets.add(w);
+      }
+    }
+    final effectiveFrom = (wallets.contains(_fromWallet))
+        ? _fromWallet
+        : (wallets.isNotEmpty ? wallets.first : null);
+    final effectiveTo = (wallets.contains(_toWallet))
+        ? _toWallet
+        : (wallets.length > 1 ? wallets[1] : (wallets.isNotEmpty ? wallets.first : null));
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
@@ -174,7 +187,7 @@ class _TransferDialogState extends State<TransferDialog> {
                 const Text('تحويل من حساب:', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<WalletModel>(
-                  initialValue: _fromWallet,
+                  initialValue: effectiveFrom,
                   isExpanded: true,
                   decoration: const InputDecoration(prefixIcon: Icon(Icons.arrow_upward_rounded)),
                   items: wallets.map((w) {
@@ -219,7 +232,7 @@ class _TransferDialogState extends State<TransferDialog> {
                 const Text('إلى حساب:', style: TextStyle(fontWeight: FontWeight.bold)),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<WalletModel>(
-                  initialValue: _toWallet,
+                  initialValue: effectiveTo,
                   isExpanded: true,
                   decoration: const InputDecoration(prefixIcon: Icon(Icons.arrow_downward_rounded)),
                   items: wallets.map((w) {

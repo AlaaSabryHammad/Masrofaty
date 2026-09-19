@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../../../core/constants/app_constants.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../models/workspace_model.dart';
 import '../../../providers/workspace_provider.dart';
@@ -22,14 +23,11 @@ class _CreateWorkspaceDialogState extends State<CreateWorkspaceDialog> {
   String _selectedCurrencySymbol = 'ر.س';
   bool _isSubmitting = false;
 
-  final List<Map<String, String>> _currencies = [
-    {'code': 'SAR', 'symbol': 'ر.س', 'label': 'ريال سعودي (SAR)'},
-    {'code': 'AED', 'symbol': 'د.إ', 'label': 'درهم إماراتي (AED)'},
-    {'code': 'EGP', 'symbol': 'ج.م', 'label': 'جنيه مصري (EGP)'},
-    {'code': 'KWD', 'symbol': 'د.ك', 'label': 'دينار كويتي (KWD)'},
-    {'code': 'USD', 'symbol': r'$', 'label': 'دولار أمريكي (USD)'},
-    {'code': 'EUR', 'symbol': '€', 'label': 'يورو (EUR)'},
-  ];
+  List<Map<String, String>> get _currencies => AppConstants.currencies.map((c) => {
+    'code': c['code']!,
+    'symbol': c['symbol']!,
+    'label': '${c['flag']} ${c['name']}',
+  }).toList();
 
   @override
   void dispose() {

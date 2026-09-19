@@ -22,20 +22,23 @@ import 'views/security/pin_lock_screen.dart';
 import 'views/splash/splash_screen.dart';
 
 import 'providers/recurring_provider.dart';
+import 'core/config/email_config.dart';
 import 'providers/workspace_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize storage
-  final storageService = await StorageService.init();
-  final securityService = SecurityService(storageService.prefs);
-
-  // Initialize Firebase safely if available
+  // 1. Initialize Firebase first safely
   try {
     await FirebaseSyncService.initialize();
-  } catch (_) {}
+  } catch (e) {
+    debugPrint('[FirebaseSyncService] init notice: $e');
+  }
 
+  // 2. Initialize storage & email config
+  final storageService = await StorageService.init();
+  await EmailConfig.init();
+  final securityService = SecurityService(storageService.prefs);
   final authService = AuthService(storageService.prefs);
 
   runApp(
@@ -56,34 +59,42 @@ void main() async {
           create: (ctx) => WorkspaceProvider(
             storageService,
             () {
-              try { ctx.read<FinanceProvider>().reload(); } catch (_) {}
-              try { ctx.read<DebtProvider>().reload(); } catch (_) {}
-              try { ctx.read<GoalProvider>().reload(); } catch (_) {}
-              try { ctx.read<ContactProvider>().reload(); } catch (_) {}
-              try { ctx.read<RecurringProvider>().reload(); } catch (_) {}
-              try { ctx.read<ThemeProvider>().refreshCurrency(); } catch (_) {}
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                try { ctx.read<FinanceProvider>().reload(); } catch (_) {}
+                try { ctx.read<DebtProvider>().reload(); } catch (_) {}
+                try { ctx.read<GoalProvider>().reload(); } catch (_) {}
+                try { ctx.read<ContactProvider>().reload(); } catch (_) {}
+                try { ctx.read<RecurringProvider>().reload(); } catch (_) {}
+                try { ctx.read<ThemeProvider>().refreshCurrency(); } catch (_) {}
+              });
             },
           ),
         ),
         ChangeNotifierProvider(
-          create: (ctx) => AuthProvider(
-            authService,
-            ctx.read<UserProfileProvider>(),
-            storageService,
-            ctx.read<WorkspaceProvider>(),
-            () {
-              final user = ctx.read<AuthProvider>().currentUser;
-              final uid = user?.id ?? 'guest';
-              try { ctx.read<WorkspaceProvider>().initForUser(uid); } catch (_) {}
-              try { ctx.read<UserProfileProvider>().initForUser(uid, user); } catch (_) {}
-              try { ctx.read<FinanceProvider>().reload(); } catch (_) {}
-              try { ctx.read<DebtProvider>().reload(); } catch (_) {}
-              try { ctx.read<GoalProvider>().reload(); } catch (_) {}
-              try { ctx.read<ContactProvider>().reload(); } catch (_) {}
-              try { ctx.read<RecurringProvider>().reload(); } catch (_) {}
-              try { ctx.read<ThemeProvider>().refreshCurrency(); } catch (_) {}
-            },
-          ),
+          create: (ctx) {
+            late final AuthProvider authProvider;
+            authProvider = AuthProvider(
+              authService,
+              ctx.read<UserProfileProvider>(),
+              storageService,
+              ctx.read<WorkspaceProvider>(),
+              () {
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  final user = authProvider.currentUser;
+                  final uid = user?.id ?? 'guest';
+                  try { ctx.read<WorkspaceProvider>().initForUser(uid); } catch (_) {}
+                  try { ctx.read<UserProfileProvider>().initForUser(uid, user); } catch (_) {}
+                  try { ctx.read<FinanceProvider>().reload(); } catch (_) {}
+                  try { ctx.read<DebtProvider>().reload(); } catch (_) {}
+                  try { ctx.read<GoalProvider>().reload(); } catch (_) {}
+                  try { ctx.read<ContactProvider>().reload(); } catch (_) {}
+                  try { ctx.read<RecurringProvider>().reload(); } catch (_) {}
+                  try { ctx.read<ThemeProvider>().refreshCurrency(); } catch (_) {}
+                });
+              },
+            );
+            return authProvider;
+          },
         ),
       ],
       child: const MasrofatyApp(),

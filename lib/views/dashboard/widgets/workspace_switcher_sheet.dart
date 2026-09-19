@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../providers/workspace_provider.dart';
 import '../../settings/widgets/saas_plans_sheet.dart';
+import '../../settings/widgets/currency_picker_sheet.dart';
 import 'create_workspace_dialog.dart';
 
 class WorkspaceSwitcherSheet extends StatelessWidget {
@@ -255,12 +256,22 @@ class WorkspaceSwitcherSheet extends StatelessWidget {
                                       ),
                                     ),
                                     const SizedBox(width: 8),
-                                    Text(
-                                      ws.currencySymbol,
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: isDark ? Colors.white54 : Colors.black45,
-                                        fontWeight: FontWeight.w600,
+                                    InkWell(
+                                      onTap: () {
+                                        Navigator.of(context).pop();
+                                        CurrencyPickerSheet.show(context);
+                                      },
+                                      borderRadius: BorderRadius.circular(6),
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                        child: Text(
+                                          '${ws.currencySymbol} ✎',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: ws.color,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
                                       ),
                                     ),
                                   ],

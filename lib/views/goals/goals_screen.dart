@@ -25,90 +25,104 @@ class GoalsScreen extends StatelessWidget {
   void _showDepositDialog(BuildContext context, GoalModel goal, String currency) {
     final amountController = TextEditingController();
     final finance = context.read<FinanceProvider>();
-    WalletModel? selectedWallet = finance.wallets.isNotEmpty ? finance.wallets.first : null;
+    final rawWallets = finance.wallets;
+    final wallets = <WalletModel>[];
+    final seen = <String>{};
+    for (final w in rawWallets) {
+      if (seen.add(w.id)) {
+        wallets.add(w);
+      }
+    }
+    WalletModel? selectedWallet = wallets.isNotEmpty ? wallets.first : null;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Row(
-            children: [
-              Icon(goal.icon, color: goal.color),
-              const SizedBox(width: 8),
-              Text('إيداع في ${goal.title}'),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'المتبقي لتحقيق الهدف: ${CurrencyFormatter.format(goal.remainingAmount, symbol: currency)}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: 'مبلغ الإيداع',
-                  suffixText: currency,
-                  prefixIcon: const Icon(Icons.add_circle_outline_rounded),
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text('خصم من محفظة:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<WalletModel>(
-                initialValue: selectedWallet,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.account_balance_wallet_rounded),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                ),
-                items: finance.wallets.map((w) {
-                  return DropdownMenuItem(
-                    value: w,
-                    child: Text(
-                      '${w.name} (${w.balance.toStringAsFixed(0)} $currency)',
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  );
-                }).toList(),
-                onChanged: (val) => setState(() => selectedWallet = val),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('إلغاء')),
-            ElevatedButton(
-              onPressed: () {
-                final amt = double.tryParse(amountController.text.trim()) ?? 0.0;
-                if (amt > 0 && selectedWallet != null) {
-                  if (amt > selectedWallet!.balance) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('رصيد المحفظة غير كافٍ!')),
-                    );
-                    return;
-                  }
-                  context.read<GoalProvider>().depositToGoal(
-                        goalId: goal.id,
-                        amount: amt,
-                        finance: finance,
-                        fromWalletId: selectedWallet!.id,
-                      );
-                  Navigator.of(ctx).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('تم إيداع المبلغ في هدف التوفير بنجاح 🎉')),
-                  );
-                }
-              },
-              child: const Text('تأكيد الإيداع'),
+        builder: (context, setState) {
+          final effectiveWallet = (wallets.contains(selectedWallet))
+              ? selectedWallet
+              : (wallets.isNotEmpty ? wallets.first : null);
+
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: Row(
+              children: [
+                Icon(goal.icon, color: goal.color),
+                const SizedBox(width: 8),
+                Text('إيداع في ${goal.title}'),
+              ],
             ),
-          ],
-        ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'المتبقي لتحقيق الهدف: ${CurrencyFormatter.format(goal.remainingAmount, symbol: currency)}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: amountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: 'مبلغ الإيداع',
+                    suffixText: currency,
+                    prefixIcon: const Icon(Icons.add_circle_outline_rounded),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text('خصم من محفظة:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<WalletModel>(
+                  initialValue: effectiveWallet,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.account_balance_wallet_rounded),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  items: wallets.map((w) {
+                    return DropdownMenuItem(
+                      value: w,
+                      child: Text(
+                        '${w.name} (${w.balance.toStringAsFixed(0)} $currency)',
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (val) => setState(() => selectedWallet = val),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('إلغاء')),
+              ElevatedButton(
+                onPressed: () {
+                  final amt = double.tryParse(amountController.text.trim()) ?? 0.0;
+                  if (amt > 0 && selectedWallet != null) {
+                    if (amt > selectedWallet!.balance) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('رصيد المحفظة غير كافٍ!')),
+                      );
+                      return;
+                    }
+                    context.read<GoalProvider>().depositToGoal(
+                          goalId: goal.id,
+                          amount: amt,
+                          finance: finance,
+                          fromWalletId: selectedWallet!.id,
+                        );
+                    Navigator.of(ctx).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('تم إيداع المبلغ في هدف التوفير بنجاح 🎉')),
+                    );
+                  }
+                },
+                child: const Text('تأكيد الإيداع'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -132,101 +146,115 @@ class GoalsScreen extends StatelessWidget {
 
     final amountController = TextEditingController();
     final finance = context.read<FinanceProvider>();
-    WalletModel? selectedWallet = finance.wallets.isNotEmpty ? finance.wallets.first : null;
+    final rawWallets = finance.wallets;
+    final wallets = <WalletModel>[];
+    final seen = <String>{};
+    for (final w in rawWallets) {
+      if (seen.add(w.id)) {
+        wallets.add(w);
+      }
+    }
+    WalletModel? selectedWallet = wallets.isNotEmpty ? wallets.first : null;
 
     showDialog(
       context: context,
       builder: (ctx) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-          title: Row(
-            children: [
-              const Icon(Icons.outbox_rounded, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text('سحب من ${goal.title}', overflow: TextOverflow.ellipsis),
-              ),
-            ],
-          ),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'الرصيد المتوفر في الهدف: ${CurrencyFormatter.format(goal.savedAmount, symbol: currency)}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: amountController,
-                keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                decoration: InputDecoration(
-                  labelText: 'المبلغ المراد سحبه',
-                  suffixText: currency,
-                  prefixIcon: const Icon(Icons.remove_circle_outline_rounded),
-                ),
-              ),
-              const SizedBox(height: 14),
-              const Text('تحويل إلى محفظة:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 6),
-              DropdownButtonFormField<WalletModel>(
-                initialValue: selectedWallet,
-                isExpanded: true,
-                decoration: const InputDecoration(
-                  prefixIcon: Icon(Icons.account_balance_wallet_rounded),
-                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                ),
-                items: finance.wallets.map((w) {
-                  return DropdownMenuItem(
-                    value: w,
-                    child: Text(
-                      '${w.name} (${w.balance.toStringAsFixed(0)} $currency)',
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  );
-                }).toList(),
-                onChanged: (val) => setState(() => selectedWallet = val),
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('إلغاء')),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
-              onPressed: () async {
-                final amt = double.tryParse(amountController.text.trim()) ?? 0.0;
-                if (amt <= 0) return;
-                if (amt > goal.savedAmount) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('المبلغ المطلوب أكبر من الرصيد المتوفر في الهدف!')),
-                  );
-                  return;
-                }
-                if (selectedWallet == null) return;
+        builder: (context, setState) {
+          final effectiveWallet = (wallets.contains(selectedWallet))
+              ? selectedWallet
+              : (wallets.isNotEmpty ? wallets.first : null);
 
-                final success = await context.read<GoalProvider>().withdrawFromGoal(
-                      goalId: goal.id,
-                      amount: amt,
-                      finance: finance,
-                      toWalletId: selectedWallet!.id,
-                    );
-                if (ctx.mounted) Navigator.of(ctx).pop();
-                if (success && context.mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        'تم سحب ${CurrencyFormatter.format(amt, symbol: currency)} وتحويلها إلى ${selectedWallet!.name} بنجاح ✅',
-                      ),
-                      backgroundColor: AppColors.success,
-                    ),
-                  );
-                }
-              },
-              child: const Text('تأكيد السحب', style: TextStyle(color: Colors.white)),
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+            title: Row(
+              children: [
+                const Icon(Icons.outbox_rounded, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text('سحب من ${goal.title}', overflow: TextOverflow.ellipsis),
+                ),
+              ],
             ),
-          ],
-        ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'الرصيد المتوفر في الهدف: ${CurrencyFormatter.format(goal.savedAmount, symbol: currency)}',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: amountController,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  decoration: InputDecoration(
+                    labelText: 'المبلغ المراد سحبه',
+                    suffixText: currency,
+                    prefixIcon: const Icon(Icons.remove_circle_outline_rounded),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                const Text('تحويل إلى محفظة:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 6),
+                DropdownButtonFormField<WalletModel>(
+                  initialValue: effectiveWallet,
+                  isExpanded: true,
+                  decoration: const InputDecoration(
+                    prefixIcon: Icon(Icons.account_balance_wallet_rounded),
+                    contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  ),
+                  items: wallets.map((w) {
+                    return DropdownMenuItem(
+                      value: w,
+                      child: Text(
+                        '${w.name} (${w.balance.toStringAsFixed(0)} $currency)',
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (val) => setState(() => selectedWallet = val),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(onPressed: () => Navigator.of(ctx).pop(), child: const Text('إلغاء')),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary),
+                onPressed: () async {
+                  final amt = double.tryParse(amountController.text.trim()) ?? 0.0;
+                  if (amt <= 0) return;
+                  if (amt > goal.savedAmount) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('المبلغ المطلوب أكبر من الرصيد المتوفر في الهدف!')),
+                    );
+                    return;
+                  }
+                  if (selectedWallet == null) return;
+
+                  final success = await context.read<GoalProvider>().withdrawFromGoal(
+                        goalId: goal.id,
+                        amount: amt,
+                        finance: finance,
+                        toWalletId: selectedWallet!.id,
+                      );
+                  if (ctx.mounted) Navigator.of(ctx).pop();
+                  if (success && context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          'تم سحب ${CurrencyFormatter.format(amt, symbol: currency)} وتحويلها إلى ${selectedWallet!.name} بنجاح ✅',
+                        ),
+                        backgroundColor: AppColors.success,
+                      ),
+                    );
+                  }
+                },
+                child: const Text('تأكيد السحب', style: TextStyle(color: Colors.white)),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -491,6 +519,7 @@ class GoalsScreen extends StatelessWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_goals',
         onPressed: () => _showAddGoal(context),
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.add_rounded, color: Colors.white),

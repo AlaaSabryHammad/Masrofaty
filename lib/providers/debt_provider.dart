@@ -148,6 +148,7 @@ class DebtProvider extends ChangeNotifier {
   Future<void> deleteDebt(String id) async {
     _debts.removeWhere((d) => d.id == id);
     await _storage.saveDebts(_debts);
+    await _storage.deleteSingleDebt(id);
     notifyListeners();
   }
 

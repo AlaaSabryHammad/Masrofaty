@@ -28,7 +28,9 @@ import 'widgets/wealth_distribution_card.dart';
 import 'widgets/sms_sync_dialog.dart';
 import 'widgets/workspace_switcher_sheet.dart';
 import 'widgets/create_workspace_dialog.dart';
+import '../widgets/user_avatar_widget.dart';
 import '../settings/widgets/saas_plans_sheet.dart';
+import '../settings/widgets/currency_picker_sheet.dart';
 
 class DashboardScreen extends StatefulWidget {
   final Function(int)? onNavigateToTab;
@@ -192,27 +194,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       },
                       child: Row(
                         children: [
-                          Container(
-                            width: 44,
-                            height: 44,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: AppColors.primary, width: 2),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primary.withValues(alpha: 0.2),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ],
-                            ),
-                            child: ClipOval(
-                              child: Image.asset(
-                                userProfile.avatarPath,
-                                fit: BoxFit.cover,
-                                errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, color: AppColors.primary),
-                              ),
-                            ),
+                          UserAvatarWidget(
+                            avatarPath: userProfile.avatarPath,
+                            size: 44,
+                            showBorder: true,
+                            borderColor: AppColors.primary,
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -271,7 +257,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
                         onPressed: () => _openSmsSync(context),
                         icon: const Icon(Icons.sms_rounded, color: Color(0xFF0284C7), size: 22),
-                        tooltip: 'مزامنة الرسائل البنكية',
+                        tooltip: 'القارئ الذكي لرسائل البنوك',
                       ),
                       // Contacts & Statements
                       IconButton(
@@ -284,6 +270,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         },
                         icon: const Icon(Icons.people_alt_rounded, color: AppColors.primaryEmerald, size: 22),
                         tooltip: 'جهات التعامل وكشوف الحساب',
+                      ),
+                      // Currency Quick Picker
+                      IconButton(
+                        padding: const EdgeInsets.all(6),
+                        constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                        onPressed: () => CurrencyPickerSheet.show(context),
+                        icon: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.35)),
+                          ),
+                          child: Text(
+                            themeProv.currencySymbol,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ),
+                        tooltip: 'تغيير العملة',
                       ),
                       // Quick Theme Toggle
                       IconButton(
@@ -608,7 +617,15 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               Row(
                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                 children: [
-                                  const Text('أهداف الادخار وصناديق التوفير', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                  const Expanded(
+                                    child: Text(
+                                      'أهداف الادخار وصناديق التوفير',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
                                   Text('${goals.length} أهداف', style: const TextStyle(fontSize: 11, color: Color(0xFF0D9488), fontWeight: FontWeight.bold)),
                                 ],
                               ),
@@ -675,7 +692,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                   Row(
                                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                     children: [
-                                      const Text('الاشتراكات والمعاملات المجدولة', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                      const Expanded(
+                                        child: Text(
+                                          'الاشتراكات والمعاملات المجدولة',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                                        ),
+                                      ),
                                       Text('${activeRec.length} مفعلة', style: const TextStyle(fontSize: 11, color: Color(0xFF9333EA), fontWeight: FontWeight.bold)),
                                     ],
                                   ),
@@ -722,22 +746,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(8),
-                                decoration: BoxDecoration(
-                                  color: AppColors.debtBorrowed.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
+                          Expanded(
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.debtBorrowed.withValues(alpha: 0.15),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(Icons.account_tree_rounded, color: AppColors.debtBorrowed, size: 20),
                                 ),
-                                child: const Icon(Icons.account_tree_rounded, color: AppColors.debtBorrowed, size: 20),
-                              ),
-                              const SizedBox(width: 10),
-                              const Text(
-                                'حالة المديونات والسلف',
-                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                              ),
-                            ],
+                                const SizedBox(width: 10),
+                                const Expanded(
+                                  child: Text(
+                                    'حالة المديونات والسلف',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                           Row(
                             children: [
@@ -940,7 +970,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(tx.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                              Text(
+                                tx.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              ),
                               const SizedBox(height: 2),
                               Text(
                                 DateHelper.formatFriendly(tx.date),
@@ -1081,11 +1116,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
                                 color: activeWs.color,
                               ),
                             ),
-                            Text(
-                              ' • ${activeWs.currencySymbol}',
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isDark ? Colors.white54 : Colors.black45,
+                            InkWell(
+                              onTap: () => CurrencyPickerSheet.show(context),
+                              borderRadius: BorderRadius.circular(6),
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                child: Text(
+                                  ' • ${activeWs.currencySymbol} ✎',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                    color: activeWs.color,
+                                  ),
+                                ),
                               ),
                             ),
                           ],

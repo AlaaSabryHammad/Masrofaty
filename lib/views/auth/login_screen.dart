@@ -4,7 +4,6 @@ import '../../core/theme/app_colors.dart';
 import '../../main.dart';
 import '../../providers/auth_provider.dart';
 import 'forgot_password_dialog.dart';
-import 'phone_auth_dialog.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -85,10 +84,19 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _loginWithGoogle() async {
     final auth = context.read<AuthProvider>();
     final success = await auth.loginWithGoogle();
-    if (mounted && success) {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const AppGate()),
-      );
+    if (mounted) {
+      if (success) {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const AppGate()),
+        );
+      } else if (auth.errorMessage != null && !auth.errorMessage!.contains('إلغاء')) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(auth.errorMessage!),
+            backgroundColor: AppColors.danger,
+          ),
+        );
+      }
     }
   }
 
@@ -282,57 +290,26 @@ class _LoginScreenState extends State<LoginScreen> {
 
                   const SizedBox(height: 20),
 
-                  // Fast sign in methods (Google, Phone OTP)
-                  Row(
-                    children: [
-                      // Google Login
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: auth.isLoading ? null : _loginWithGoogle,
-                          icon: Image.network(
-                            'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
-                            width: 20,
-                            height: 20,
-                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.g_mobiledata_rounded, size: 24),
-                          ),
-                          label: const Text(
-                            'جوجل',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          ),
-                        ),
+                  // Fast sign in method (Google)
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: auth.isLoading ? null : _loginWithGoogle,
+                      icon: Image.network(
+                        'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
+                        width: 20,
+                        height: 20,
+                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.g_mobiledata_rounded, size: 24),
                       ),
-                      const SizedBox(width: 12),
-                      // Phone OTP Login
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (_) => PhoneAuthDialog(
-                                onSuccess: () {
-                                  Navigator.of(context).pushReplacement(
-                                    MaterialPageRoute(builder: (_) => const AppGate()),
-                                  );
-                                },
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.phone_iphone_rounded, size: 20, color: Color(0xFF0284C7)),
-                          label: const Text(
-                            'رقم الجوال',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          ),
-                        ),
+                      label: const Text(
+                        'المتابعة باستخدام حساب جوجل',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
                       ),
-                    ],
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
                   ),
 
                   const SizedBox(height: 14),

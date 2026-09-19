@@ -173,6 +173,8 @@ class TransactionsScreen extends StatelessWidget {
                                   children: [
                                     Text(
                                       tx.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
                                       style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
                                     ),
                                     const SizedBox(height: 4),
@@ -181,16 +183,20 @@ class TransactionsScreen extends StatelessWidget {
                                         if (wallet != null) ...[
                                           Icon(wallet.icon, size: 13, color: isDark ? Colors.white60 : Colors.black54),
                                           const SizedBox(width: 4),
-                                          Text(
-                                            wallet.name,
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                          Flexible(
+                                            child: Text(
+                                              wallet.name,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: isDark ? AppColors.darkTextSecondary : AppColors.lightTextSecondary,
+                                              ),
                                             ),
                                           ),
-                                          const SizedBox(width: 8),
+                                          const SizedBox(width: 6),
                                           Text('•', style: TextStyle(color: isDark ? Colors.white30 : Colors.black26)),
-                                          const SizedBox(width: 8),
+                                          const SizedBox(width: 6),
                                         ],
                                         Text(
                                           DateHelper.formatFriendly(tx.date),
@@ -264,6 +270,7 @@ class TransactionsScreen extends StatelessWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton(
+        heroTag: 'fab_transactions',
         onPressed: () => _showAddTransaction(context),
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add_rounded, color: Colors.white, size: 28),

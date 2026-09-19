@@ -4,7 +4,6 @@ import '../../core/theme/app_colors.dart';
 import '../../providers/auth_provider.dart';
 import '../../main.dart';
 import 'email_otp_dialog.dart';
-import 'phone_auth_dialog.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -369,61 +368,45 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
                   const SizedBox(height: 20),
 
-                  // Social Buttons Row
-                  Row(
-                    children: [
-                      // Google Sign Up
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            final navigator = Navigator.of(context);
-                            final ok = await auth.loginWithGoogle();
-                            if (ok && mounted) {
-                              navigator.pushAndRemoveUntil(
-                                MaterialPageRoute(builder: (_) => const AppGate()),
-                                (route) => false,
-                              );
-                            }
-                          },
-                          icon: Image.network(
-                            'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
-                            width: 18,
-                            height: 18,
-                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.g_mobiledata_rounded, size: 24),
-                          ),
-                          label: const Text('جوجل', style: TextStyle(fontWeight: FontWeight.bold)),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      // Phone Sign Up
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            showDialog(
-                              context: context,
-                              builder: (_) => PhoneAuthDialog(
-                                onSuccess: () {
-                                  Navigator.of(context).pushAndRemoveUntil(
-                                    MaterialPageRoute(builder: (_) => const AppGate()),
-                                    (route) => false,
-                                  );
-                                },
+                  // Google Sign Up
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final navigator = Navigator.of(context);
+                        final messenger = ScaffoldMessenger.of(context);
+                        final ok = await auth.loginWithGoogle();
+                        if (mounted) {
+                          if (ok) {
+                            navigator.pushAndRemoveUntil(
+                              MaterialPageRoute(builder: (_) => const AppGate()),
+                              (route) => false,
+                            );
+                          } else if (auth.errorMessage != null && !auth.errorMessage!.contains('إلغاء')) {
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(auth.errorMessage!),
+                                backgroundColor: AppColors.danger,
                               ),
                             );
-                          },
-                          icon: const Icon(Icons.phone_iphone_rounded, size: 18),
-                          label: const Text('الجوال', style: TextStyle(fontWeight: FontWeight.bold)),
-                          style: OutlinedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          ),
-                        ),
+                          }
+                        }
+                      },
+                      icon: Image.network(
+                        'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg',
+                        width: 18,
+                        height: 18,
+                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.g_mobiledata_rounded, size: 24),
                       ),
-                    ],
+                      label: const Text(
+                        'التسجيل باستخدام حساب جوجل',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 13),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      ),
+                    ),
                   ),
 
                   const SizedBox(height: 28),

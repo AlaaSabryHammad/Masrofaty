@@ -33,6 +33,7 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
 
   CategoryModel? _selectedCategory;
   WalletModel? _selectedWallet;
+  String? _selectedWalletId;
   DateTime _selectedDate = DateTime.now();
 
   @override
@@ -48,22 +49,28 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
       _personController.text = tx.personName ?? '';
       _notesController.text = tx.notes ?? '';
       _selectedDate = tx.date;
+      _selectedWalletId = tx.walletId;
     } else {
       _isExpense = widget.initialIsExpense;
     }
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       final finance = context.read<FinanceProvider>();
       final filteredCats = finance.categories.where((c) => c.isExpense == _isExpense).toList();
       setState(() {
         if (widget.transactionToEdit != null) {
           _selectedCategory = finance.getCategoryById(widget.transactionToEdit!.categoryId) ??
               (filteredCats.isNotEmpty ? filteredCats.first : null);
-          _selectedWallet = finance.getWalletById(widget.transactionToEdit!.walletId) ??
+          _selectedWalletId = widget.transactionToEdit!.walletId;
+          _selectedWallet = finance.getWalletById(_selectedWalletId!) ??
               (finance.wallets.isNotEmpty ? finance.wallets.first : null);
         } else {
           if (filteredCats.isNotEmpty) _selectedCategory = filteredCats.first;
-          if (finance.wallets.isNotEmpty) _selectedWallet = finance.wallets.first;
+          if (finance.wallets.isNotEmpty && _selectedWalletId == null) {
+            _selectedWallet = finance.wallets.first;
+            _selectedWalletId = _selectedWallet!.id;
+          }
         }
       });
     });
@@ -109,7 +116,9 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
 
   void _save() {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedCategory == null || _selectedWallet == null) return;
+    final finance = context.read<FinanceProvider>();
+    final walletId = _selectedWalletId ?? (_selectedWallet?.id) ?? (finance.wallets.isNotEmpty ? finance.wallets.first.id : null);
+    if (_selectedCategory == null || walletId == null) return;
 
     final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
     if (amount <= 0) return;
@@ -127,7 +136,7 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
         amount: amount,
         type: _isExpense ? 'expense' : 'income',
         categoryId: _selectedCategory!.id,
-        walletId: _selectedWallet!.id,
+        walletId: walletId,
         date: _selectedDate,
         notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
         personName: personName,
@@ -154,7 +163,7 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
             amount: amount,
             type: _isExpense ? 'expense' : 'income',
             categoryId: _selectedCategory!.id,
-            walletId: _selectedWallet!.id,
+            walletId: walletId,
             date: _selectedDate,
             notes: _notesController.text.trim().isEmpty ? null : _notesController.text.trim(),
             personName: personName,
@@ -183,6 +192,17 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
     final currency = context.watch<ThemeProvider>().currencySymbol;
     final finance = context.watch<FinanceProvider>();
     final availableCategories = finance.categories.where((c) => c.isExpense == _isExpense).toList();
+
+    final distinctWallets = <WalletModel>[];
+    final seenWalletIds = <String>{};
+    for (final w in finance.wallets) {
+      if (seenWalletIds.add(w.id)) {
+        distinctWallets.add(w);
+      }
+    }
+    final effectiveWalletId = (distinctWallets.any((w) => w.id == _selectedWalletId))
+        ? _selectedWalletId
+        : (distinctWallets.isNotEmpty ? distinctWallets.first.id : null);
 
     return Container(
       height: MediaQuery.of(context).size.height * 0.88,
@@ -449,15 +469,15 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                           children: [
                             const Text('المحفظة / الحساب', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold)),
                             const SizedBox(height: 8),
-                            DropdownButtonFormField<WalletModel>(
-                              initialValue: _selectedWallet,
+                            DropdownButtonFormField<String>(
+                              initialValue: effectiveWalletId,
                               isExpanded: true,
                               decoration: const InputDecoration(
                                 contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                               ),
-                              items: finance.wallets.map((w) {
-                                return DropdownMenuItem(
-                                  value: w,
+                              items: distinctWallets.map((w) {
+                                return DropdownMenuItem<String>(
+                                  value: w.id,
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
@@ -475,7 +495,15 @@ class _AddTransactionDialogState extends State<AddTransactionDialog> {
                                   ),
                                 );
                               }).toList(),
-                              onChanged: (val) => setState(() => _selectedWallet = val),
+                              onChanged: (val) {
+                                setState(() {
+                                  _selectedWalletId = val;
+                                  _selectedWallet = distinctWallets.firstWhere(
+                                    (w) => w.id == val,
+                                    orElse: () => distinctWallets.first,
+                                  );
+                                });
+                              },
                             ),
                           ],
                         ),

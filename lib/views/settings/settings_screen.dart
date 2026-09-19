@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../core/constants/app_constants.dart';
@@ -20,12 +22,16 @@ import '../profile/profile_screen.dart';
 import '../security/pin_lock_screen.dart';
 import 'package:flutter/services.dart';
 import '../../providers/recurring_provider.dart';
+import '../../providers/contact_provider.dart';
 import '../categories/categories_screen.dart';
 import '../recurring/recurring_screen.dart';
 import '../budgets/budgets_screen.dart';
+import '../widgets/user_avatar_widget.dart';
 import '../../providers/workspace_provider.dart';
 import '../dashboard/widgets/workspace_switcher_sheet.dart';
 import 'widgets/saas_plans_sheet.dart';
+import 'widgets/currency_picker_sheet.dart';
+import 'email_smtp_settings_dialog.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -54,70 +60,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showCurrencyPicker(BuildContext context) {
-    final themeProv = context.read<ThemeProvider>();
-
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) {
-        final isDark = Theme.of(ctx).brightness == Brightness.dark;
-        return Container(
-          height: 380,
-          decoration: BoxDecoration(
-            color: isDark ? AppColors.darkCard : AppColors.lightSurface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-          ),
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(top: 12, bottom: 8),
-                width: 48,
-                height: 5,
-                decoration: BoxDecoration(
-                  color: isDark ? Colors.white24 : Colors.black12,
-                  borderRadius: BorderRadius.circular(2.5),
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Text('اختر العملة الافتراضية', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              ),
-              const Divider(height: 1),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: AppConstants.currencies.length,
-                  itemBuilder: (context, index) {
-                    final curr = AppConstants.currencies[index];
-                    final isSel = themeProv.currencySymbol == curr['symbol'];
-
-                    return ListTile(
-                      leading: Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.15),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          curr['symbol']!,
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
-                        ),
-                      ),
-                      title: Text(curr['name']!, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      subtitle: Text(curr['code']!),
-                      trailing: isSel ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
-                      onTap: () {
-                        themeProv.setCurrency(curr['symbol']!);
-                        Navigator.of(ctx).pop();
-                      },
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
+    CurrencyPickerSheet.show(context);
   }
 
   void _togglePin(bool value) {
@@ -266,9 +209,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final debts = context.read<DebtProvider>();
     final goals = context.read<GoalProvider>();
     final recurring = context.read<RecurringProvider>();
+    final storage = context.read<StorageService>();
     final userId = auth.currentUser?.id ?? 'guest';
 
-    final success = await FirebaseSyncService.syncToCloud(
+    // 1. Sync live collections
+    final cloudSuccess = await storage.uploadAllLocalToCloud(userId: userId);
+
+    // 2. Also keep snapshot backup
+    await FirebaseSyncService.syncToCloud(
       finance: finance,
       debts: debts,
       goals: goals,
@@ -279,8 +227,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
-        content: Text(success ? 'تمت المزامنة السحابية مع Firebase بنجاح ☁️' : 'تنبيه: يتطلب اتصالاً بالإنترنت وإعداد Firebase Console'),
-        backgroundColor: success ? AppColors.success : AppColors.warning,
+        content: Text(cloudSuccess ? 'تمت المزامنة السحابية مع Firebase بنجاح ☁️' : 'تنبيه: يتطلب اتصالاً بالإنترنت وإعداد Firebase Console'),
+        backgroundColor: cloudSuccess ? AppColors.success : AppColors.warning,
       ),
     );
   }
@@ -292,15 +240,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final debts = context.read<DebtProvider>();
     final goals = context.read<GoalProvider>();
     final recurring = context.read<RecurringProvider>();
+    final contacts = context.read<ContactProvider>();
+    final theme = context.read<ThemeProvider>();
+    final storage = context.read<StorageService>();
     final userId = auth.currentUser?.id ?? 'guest';
 
-    final success = await FirebaseSyncService.restoreFromCloud(
-      finance: finance,
-      debts: debts,
-      goals: goals,
-      recurring: recurring,
-      userId: userId,
-    );
+    // 1. Try restore from Firestore collections
+    bool success = await storage.syncFromCloud(userId: userId);
+
+    // 2. Fallback to backup snapshot if collections were empty
+    if (!success) {
+      success = await FirebaseSyncService.restoreFromCloud(
+        finance: finance,
+        debts: debts,
+        goals: goals,
+        recurring: recurring,
+        userId: userId,
+      );
+    }
+
+    if (success) {
+      finance.reload();
+      debts.reload();
+      goals.reload();
+      recurring.reload();
+      contacts.reload();
+      theme.refreshCurrency();
+    }
 
     messenger.showSnackBar(
       SnackBar(
@@ -438,20 +404,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                   child: Row(
                     children: [
-                      Container(
-                        width: 56,
-                        height: 56,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: AppColors.primary, width: 2),
-                        ),
-                        child: ClipOval(
-                          child: Image.asset(
-                            userProfile.avatarPath,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) => const Icon(Icons.person, color: AppColors.primary),
-                          ),
-                        ),
+                      UserAvatarWidget(
+                        avatarPath: userProfile.avatarPath,
+                        size: 56,
+                        showBorder: true,
+                        borderColor: AppColors.primary,
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -512,12 +469,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Section: Account & Authentication
           _buildSectionHeader(context, 'الحساب وتسجيل الدخول'),
           const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          Material(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+              side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
             ),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
                 ListTile(
@@ -638,6 +596,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   leading: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(Icons.mark_email_read_rounded, color: AppColors.primary),
+                  ),
+                  title: const Text('إعدادات بريد التحقق (Gmail SMTP)', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: const Text('ضبط بريد إرسال رموز التحقق الحقيقية OTP', style: TextStyle(fontSize: 12)),
+                  trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 14),
+                  onTap: () => EmailSmtpSettingsDialog.show(context),
+                ),
+                const Divider(height: 1),
+                ListTile(
+                  leading: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
                       color: AppColors.danger.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -656,69 +629,72 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Section: Appearance
           _buildSectionHeader(context, 'المظهر والثيم'),
           const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          Material(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+              side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
             ),
-            child: Column(
-              children: [
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  leading: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
+            clipBehavior: Clip.antiAlias,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        themeProv.isDarkMode ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
+                        color: AppColors.primary,
+                      ),
                     ),
-                    child: Icon(
-                      themeProv.isDarkMode ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                      color: AppColors.primary,
+                    title: const Text('الوضع الليلي والنهاري', style: TextStyle(fontWeight: FontWeight.bold)),
+                    subtitle: Text(
+                      themeProv.themeMode == ThemeMode.dark
+                          ? 'الوضع الليلي (مفعل)'
+                          : (themeProv.themeMode == ThemeMode.light ? 'الوضع النهاري' : 'تلقائي حسب النظام'),
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    trailing: Switch(
+                      value: themeProv.isDarkMode,
+                      activeThumbColor: AppColors.primary,
+                      onChanged: (_) => themeProv.toggleTheme(),
                     ),
                   ),
-                  title: const Text('الوضع الليلي والنهاري', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(
-                    themeProv.themeMode == ThemeMode.dark
-                        ? 'الوضع الليلي (مفعل)'
-                        : (themeProv.themeMode == ThemeMode.light ? 'الوضع النهاري' : 'تلقائي حسب النظام'),
-                    style: const TextStyle(fontSize: 12),
+                  const Divider(),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildThemeOption(
+                        context,
+                        'فاتح',
+                        Icons.light_mode_rounded,
+                        themeProv.themeMode == ThemeMode.light,
+                        () => themeProv.setThemeMode(ThemeMode.light),
+                      ),
+                      _buildThemeOption(
+                        context,
+                        'داكن',
+                        Icons.dark_mode_rounded,
+                        themeProv.themeMode == ThemeMode.dark,
+                        () => themeProv.setThemeMode(ThemeMode.dark),
+                      ),
+                      _buildThemeOption(
+                        context,
+                        'تلقائي',
+                        Icons.settings_system_daydream_rounded,
+                        themeProv.themeMode == ThemeMode.system,
+                        () => themeProv.setThemeMode(ThemeMode.system),
+                      ),
+                    ],
                   ),
-                  trailing: Switch(
-                    value: themeProv.isDarkMode,
-                    activeThumbColor: AppColors.primary,
-                    onChanged: (_) => themeProv.toggleTheme(),
-                  ),
-                ),
-                const Divider(),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildThemeOption(
-                      context,
-                      'فاتح',
-                      Icons.light_mode_rounded,
-                      themeProv.themeMode == ThemeMode.light,
-                      () => themeProv.setThemeMode(ThemeMode.light),
-                    ),
-                    _buildThemeOption(
-                      context,
-                      'داكن',
-                      Icons.dark_mode_rounded,
-                      themeProv.themeMode == ThemeMode.dark,
-                      () => themeProv.setThemeMode(ThemeMode.dark),
-                    ),
-                    _buildThemeOption(
-                      context,
-                      'تلقائي',
-                      Icons.settings_system_daydream_rounded,
-                      themeProv.themeMode == ThemeMode.system,
-                      () => themeProv.setThemeMode(ThemeMode.system),
-                    ),
-                  ],
-                ),
-              ],
+                ],
+              ),
             ),
           ),
 
@@ -727,12 +703,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Section: General & Financial
           _buildSectionHeader(context, 'الخيارات المالية والادخار'),
           const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          Material(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+              side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
             ),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
                 ListTile(
@@ -745,7 +722,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: const Icon(Icons.monetization_on_rounded, color: AppColors.info),
                   ),
                   title: const Text('العملة الحالية', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: Text(themeProv.currencySymbol),
+                  subtitle: Builder(
+                    builder: (_) {
+                      final currInfo = AppConstants.getCurrencyBySymbol(themeProv.currencySymbol);
+                      return Text('${currInfo['flag']} ${currInfo['name']} (${currInfo['symbol']})');
+                    },
+                  ),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                   onTap: () => _showCurrencyPicker(context),
                 ),
@@ -843,12 +825,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Section: SMS Bank Sync
           _buildSectionHeader(context, 'الرسائل البنكية التلقائية (SMS)'),
           const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          Material(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+              side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
             ),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
                 ListTile(
@@ -860,8 +843,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     child: const Icon(Icons.sms_rounded, color: Color(0xFF0284C7)),
                   ),
-                  title: const Text('القراءة التلقائية لرسائل البنوك', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('استقبال إشعارات البنوك وتسجيل العمليات تلقائياً', style: TextStyle(fontSize: 12)),
+                  title: const Text('قارئ رسائل البنوك الذكي', style: TextStyle(fontWeight: FontWeight.bold)),
+                  subtitle: Text(
+                    !kIsWeb && Platform.isIOS
+                        ? 'تحليل ولصق رسائل البنوك وأتمتة الاختصارات في iOS'
+                        : 'استقبال إشعارات البنوك وتسجيل العمليات تلقائياً',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                   onTap: () {
                     showModalBottomSheet(
@@ -882,8 +870,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     ),
                     child: const Icon(Icons.sync_rounded, color: AppColors.primary),
                   ),
-                  title: const Text('فحص الرسائل البنكية السابقة', style: TextStyle(fontWeight: FontWeight.bold)),
-                  subtitle: const Text('مسح الرسائل الواردة لآخر 30 يوم وتسجيلها', style: TextStyle(fontSize: 12)),
+                  title: Text(
+                    !kIsWeb && Platform.isIOS
+                        ? 'لصق وتحليل رسائل متعددة'
+                        : 'فحص الرسائل البنكية السابقة',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  subtitle: Text(
+                    !kIsWeb && Platform.isIOS
+                        ? 'تحليل مجموعة رسائل بنكية دفعة واحدة وتسجيلها'
+                        : 'مسح الرسائل الواردة لآخر 30 يوم وتسجيلها',
+                    style: const TextStyle(fontSize: 12),
+                  ),
                   trailing: const Icon(Icons.arrow_forward_ios_rounded, size: 16),
                   onTap: () {
                     showModalBottomSheet(
@@ -903,12 +901,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Section: Security
           _buildSectionHeader(context, 'الأمان والحماية'),
           const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          Material(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+              side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
             ),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
                 ListTile(
@@ -937,12 +936,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Section: Backup & Export
           _buildSectionHeader(context, 'النسخ الاحتياطي والتصدير'),
           const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          Material(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
+              side: BorderSide(color: isDark ? AppColors.darkBorder : AppColors.lightBorder),
             ),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
                 ListTile(
@@ -998,12 +998,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Section: Firebase Cloud Sync
           _buildSectionHeader(context, 'المزامنة السحابية (Firebase Cloud)'),
           const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          Material(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
+              side: BorderSide(color: const Color(0xFFF59E0B).withValues(alpha: 0.3)),
             ),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
                 ListTile(
@@ -1044,12 +1045,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // Section: Reset Data (Danger Zone)
           _buildSectionHeader(context, 'تصفير البيانات'),
           const SizedBox(height: 10),
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          Material(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: AppColors.danger.withValues(alpha: 0.3)),
+              side: BorderSide(color: AppColors.danger.withValues(alpha: 0.3)),
             ),
+            clipBehavior: Clip.antiAlias,
             child: ListTile(
               leading: Container(
                 padding: const EdgeInsets.all(10),

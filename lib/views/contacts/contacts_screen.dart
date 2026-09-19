@@ -277,6 +277,7 @@ class _ContactsScreenState extends State<ContactsScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_contacts',
         backgroundColor: AppColors.primary,
         onPressed: () => _showAddContactDialog(context),
         icon: const Icon(Icons.person_add_rounded, color: Colors.white),

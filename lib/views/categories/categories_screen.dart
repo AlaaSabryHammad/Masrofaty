@@ -323,6 +323,7 @@ class _CategoriesScreenState extends State<CategoriesScreen> with SingleTickerPr
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_categories',
         onPressed: () {
           final isExp = _tabController.index == 0;
           _showAddEditDialog(isExpense: isExp);

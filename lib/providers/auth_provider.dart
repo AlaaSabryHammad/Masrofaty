@@ -32,6 +32,15 @@ class AuthProvider extends ChangeNotifier {
       if (_userProfileProvider != null) {
         _userProfileProvider.initForUser(_currentUser!.id, _currentUser);
       }
+      if (!_currentUser!.isGuest) {
+        _storageService?.initOrMigrateUser(_currentUser!.id).then((_) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            _onUserChanged?.call();
+          });
+        }).catchError((e) {
+          debugPrint('[AuthProvider] Startup Firestore sync notice: $e');
+        });
+      }
     }
   }
 
@@ -93,6 +102,14 @@ class AuthProvider extends ChangeNotifier {
     try { _workspaceProvider?.initForUser(user.id); } catch (_) {}
     try { _syncToProfile(user); } catch (_) {}
     try { _onUserChanged?.call(); } catch (_) {}
+
+    if (!user.isGuest) {
+      _storageService?.initOrMigrateUser(user.id).then((_) {
+        _onUserChanged?.call();
+      }).catchError((e) {
+        debugPrint('[AuthProvider] Login Firestore sync notice: $e');
+      });
+    }
   }
 
   Future<bool> registerWithEmail({

@@ -35,37 +35,37 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: String.fromEnvironment('FIREBASE_WEB_API_KEY', defaultValue: 'YOUR_WEB_API_KEY'),
-    appId: '1:102938475610:web:abcdef1234567890',
-    messagingSenderId: '102938475610',
-    projectId: 'masrofaty-app',
-    authDomain: 'masrofaty-app.firebaseapp.com',
-    storageBucket: 'masrofaty-app.appspot.com',
+    apiKey: String.fromEnvironment('FIREBASE_WEB_API_KEY', defaultValue: 'AIzaSyD-0JTojIURXvV54Ip14HPCv2jh_Xxz8a8'),
+    appId: '1:309719860143:web:masrofatywebclientid',
+    messagingSenderId: '309719860143',
+    projectId: 'masrofaty-sync',
+    authDomain: 'masrofaty-sync.firebaseapp.com',
+    storageBucket: 'masrofaty-sync.firebasestorage.app',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: String.fromEnvironment('FIREBASE_ANDROID_API_KEY', defaultValue: 'YOUR_ANDROID_API_KEY'),
-    appId: '1:102938475610:android:fedcba0987654321',
-    messagingSenderId: '102938475610',
-    projectId: 'masrofaty-app',
-    storageBucket: 'masrofaty-app.appspot.com',
+    apiKey: String.fromEnvironment('FIREBASE_ANDROID_API_KEY', defaultValue: 'AIzaSyD-0JTojIURXvV54Ip14HPCv2jh_Xxz8a8'),
+    appId: '1:309719860143:android:be0f6a910e2dc81b78e55a',
+    messagingSenderId: '309719860143',
+    projectId: 'masrofaty-sync',
+    storageBucket: 'masrofaty-sync.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: String.fromEnvironment('FIREBASE_IOS_API_KEY', defaultValue: 'YOUR_IOS_API_KEY'),
-    appId: '1:102938475610:ios:1122334455667788',
-    messagingSenderId: '102938475610',
-    projectId: 'masrofaty-app',
-    storageBucket: 'masrofaty-app.appspot.com',
+    apiKey: String.fromEnvironment('FIREBASE_IOS_API_KEY', defaultValue: 'AIzaSyDejltZCbzRDSJlulUS8OX0oQ1CyUl5ey8'),
+    appId: '1:309719860143:ios:df4662df8457584678e55a',
+    messagingSenderId: '309719860143',
+    projectId: 'masrofaty-sync',
+    storageBucket: 'masrofaty-sync.firebasestorage.app',
     iosBundleId: 'com.masrofaty.app.masrofaty',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: String.fromEnvironment('FIREBASE_MACOS_API_KEY', defaultValue: 'YOUR_MACOS_API_KEY'),
-    appId: '1:102938475610:ios:9988776655443322',
-    messagingSenderId: '102938475610',
-    projectId: 'masrofaty-app',
-    storageBucket: 'masrofaty-app.appspot.com',
+    apiKey: String.fromEnvironment('FIREBASE_MACOS_API_KEY', defaultValue: 'AIzaSyDejltZCbzRDSJlulUS8OX0oQ1CyUl5ey8'),
+    appId: '1:309719860143:ios:df4662df8457584678e55a',
+    messagingSenderId: '309719860143',
+    projectId: 'masrofaty-sync',
+    storageBucket: 'masrofaty-sync.firebasestorage.app',
     iosBundleId: 'com.masrofaty.app.masrofaty',
   );
 }

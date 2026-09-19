@@ -1,12 +1,13 @@
 import 'dart:convert';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../firebase_options.dart';
 import '../../models/account_record.dart';
 import '../../models/user_model.dart';
-import 'firebase_sync_service.dart';
 
 class AuthResult {
   final bool isSuccess;
@@ -37,8 +38,8 @@ class AuthService {
 
   bool get _isRealFirebaseConfigured {
     try {
-      final key = DefaultFirebaseOptions.android.apiKey;
-      return !key.contains('Demo') && !key.contains('Masrofaty');
+      final key = DefaultFirebaseOptions.currentPlatform.apiKey;
+      return !key.startsWith('YOUR_') && key.startsWith('A') && key.length == 39;
     } catch (_) {
       return false;
     }
@@ -50,7 +51,7 @@ class AuthService {
       return;
     }
     try {
-      if (FirebaseSyncService.isInitialized) {
+      if (Firebase.apps.isNotEmpty) {
         _firebaseAuth = FirebaseAuth.instance;
       }
     } catch (_) {
@@ -362,50 +363,86 @@ class AuthService {
 
   /// 5. Sign In with Google
   Future<AuthResult> signInWithGoogle() async {
-    String googleEmail = 'user@gmail.com';
-    String googleName = 'مستخدم Google';
-    String? photoUrl;
-
     try {
+      try {
+        await GoogleSignIn.instance.initialize();
+      } catch (_) {}
+
+      final GoogleSignInAccount account = await GoogleSignIn.instance.authenticate();
+      final String? idToken = account.authentication.idToken;
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        idToken: idToken,
+      );
+
+      String googleEmail = account.email.trim().toLowerCase();
+      String googleName = account.displayName?.trim() ?? '';
+      if (googleName.isEmpty) {
+        googleName = googleEmail.contains('@') ? googleEmail.split('@').first : 'مستخدم Google';
+      }
+      String? photoUrl = account.photoUrl;
+      String userId = 'google_${account.id}';
+
       if (_auth != null) {
-        final googleProvider = GoogleAuthProvider();
-        final cred = await _auth!.signInWithProvider(googleProvider).timeout(const Duration(seconds: 3));
-        final fbUser = cred.user;
-        if (fbUser != null) {
-          googleEmail = fbUser.email ?? googleEmail;
-          googleName = fbUser.displayName ?? googleName;
-          photoUrl = fbUser.photoURL;
+        try {
+          final userCredential = await _auth!.signInWithCredential(credential);
+          final fbUser = userCredential.user;
+          if (fbUser != null) {
+            userId = fbUser.uid;
+            if (fbUser.email != null && fbUser.email!.isNotEmpty) {
+              googleEmail = fbUser.email!.trim().toLowerCase();
+            }
+            if (fbUser.displayName != null && fbUser.displayName!.trim().isNotEmpty) {
+              googleName = fbUser.displayName!.trim();
+            }
+            if (fbUser.photoURL != null && fbUser.photoURL!.isNotEmpty) {
+              photoUrl = fbUser.photoURL;
+            }
+          }
+        } catch (e) {
+          debugPrint('Firebase Auth link warning: $e');
         }
       }
-    } catch (_) {}
 
-    // Find or create in accounts database
-    final accounts = getAllAccounts();
-    final existingIndex = accounts.indexWhere(
-      (a) => a.user.email?.toLowerCase() == googleEmail.toLowerCase(),
-    );
-
-    UserModel user;
-    if (existingIndex != -1) {
-      user = accounts[existingIndex].user.copyWith(lastLoginAt: DateTime.now());
-      accounts[existingIndex] = accounts[existingIndex].copyWith(user: user);
-    } else {
-      user = UserModel(
-        id: 'google_${_uuid.v4().substring(0, 8)}',
-        name: googleName,
-        email: googleEmail,
-        photoUrl: photoUrl,
-        authMethod: 'google',
-        isGuest: false,
-        createdAt: DateTime.now(),
-        lastLoginAt: DateTime.now(),
+      // Find or create in accounts database
+      final accounts = getAllAccounts();
+      final existingIndex = accounts.indexWhere(
+        (a) => a.user.email?.toLowerCase() == googleEmail.toLowerCase(),
       );
-      accounts.add(AccountRecord(user: user));
-    }
 
-    await _saveAccounts(accounts);
-    await _persistUser(user);
-    return AuthResult.success(user);
+      UserModel user;
+      if (existingIndex != -1) {
+        final old = accounts[existingIndex].user;
+        user = old.copyWith(
+          id: userId,
+          name: googleName,
+          email: googleEmail,
+          photoUrl: photoUrl ?? old.photoUrl,
+          authMethod: 'google',
+          isGuest: false,
+          lastLoginAt: DateTime.now(),
+        );
+        accounts[existingIndex] = accounts[existingIndex].copyWith(user: user);
+      } else {
+        user = UserModel(
+          id: userId,
+          name: googleName,
+          email: googleEmail,
+          photoUrl: photoUrl,
+          authMethod: 'google',
+          isGuest: false,
+          createdAt: DateTime.now(),
+          lastLoginAt: DateTime.now(),
+        );
+        accounts.add(AccountRecord(user: user));
+      }
+
+      await _saveAccounts(accounts);
+      await _persistUser(user);
+      return AuthResult.success(user);
+    } catch (e, stack) {
+      debugPrint('Google Sign-In error: $e\n$stack');
+      return AuthResult.failure('تعذر تسجيل الدخول باستخدام Google: $e');
+    }
   }
 
   /// 6. Phone Authentication (SMS OTP)
@@ -504,6 +541,9 @@ class AuthService {
 
   /// 9. Sign Out
   Future<void> signOut() async {
+    try {
+      await GoogleSignIn.instance.signOut();
+    } catch (_) {}
     try {
       if (_auth != null) {
         await _auth!.signOut().timeout(const Duration(seconds: 2));

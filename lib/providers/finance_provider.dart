@@ -302,6 +302,7 @@ class FinanceProvider extends ChangeNotifier {
 
     await _storage.saveTransactions(_transactions);
     await _storage.saveWallets(_wallets);
+    await _storage.deleteSingleTransaction(id);
     notifyListeners();
   }
 
@@ -388,6 +389,7 @@ class FinanceProvider extends ChangeNotifier {
 
     _wallets.removeAt(index);
     await _storage.saveWallets(_wallets);
+    await _storage.deleteSingleWallet(walletId);
     notifyListeners();
     return true;
   }
@@ -463,6 +465,7 @@ class FinanceProvider extends ChangeNotifier {
 
     _categories.removeWhere((c) => c.id == categoryId);
     await _storage.saveCategories(_categories);
+    await _storage.deleteSingleCategory(categoryId);
     if (txModified) {
       await _storage.saveTransactions(_transactions);
     }

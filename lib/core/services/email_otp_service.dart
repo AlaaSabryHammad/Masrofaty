@@ -1,5 +1,9 @@
 import 'dart:math';
 import 'package:flutter/foundation.dart';
+import 'package:mailer/mailer.dart';
+import 'package:mailer/smtp_server.dart';
+
+import '../config/email_config.dart';
 
 class OtpRecord {
   final String email;
@@ -84,7 +88,7 @@ class EmailOtpService {
     return remaining > 0 ? remaining : 0;
   }
 
-  /// Generate and dispatch OTP email
+  /// Generate and dispatch OTP email via Gmail SMTP
   Future<OtpSendResult> sendOtp({
     required String email,
     required String userName,
@@ -105,6 +109,13 @@ class EmailOtpService {
       );
     }
 
+    // Verify SMTP is configured
+    if (!EmailConfig.isConfigured) {
+      return OtpSendResult.failure(
+        'لم يتم ضبط بيانات بريد الإرسال (Gmail SMTP) بعد.\nيرجى تعيين البريد وكلمة مرور التطبيقات (App Password).',
+      );
+    }
+
     // Generate fresh OTP code
     final code = _generateOtp();
     final now = DateTime.now();
@@ -116,9 +127,6 @@ class EmailOtpService {
       expiresAt: now.add(otpValidityDuration),
       attempts: 0,
     );
-
-    _activeOtps[cleanEmail] = record;
-    _lastSentTimestamps[cleanEmail] = now;
 
     // Build email template
     final subject = 'رمز التحقق الخاص بك في تطبيق مصروفاتي: $code';
@@ -134,21 +142,91 @@ class EmailOtpService {
 يرجى عدم مشاركة هذا الرمز مع أي شخص حفاظاً على أمان بياناتك.
 
 مع تحيات،
-فريق مصروفاتي
+فريق تطبيق مصروفاتي
 ''';
 
-    debugPrint('====================================================');
-    debugPrint('[EmailOtpService] Sending OTP Email:');
-    debugPrint('To: $cleanEmail');
-    debugPrint('Subject: $subject');
-    debugPrint('Code: $code');
-    debugPrint('Content Preview:\n$plainBody');
-    debugPrint('====================================================');
+    final htmlBody = '''
+<!DOCTYPE html>
+<html dir="rtl" lang="ar">
+<head>
+  <meta charset="utf-8">
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; margin: 0; padding: 20px; color: #1e293b; direction: rtl; text-align: right; }
+    .card { max-width: 520px; margin: 0 auto; background: #ffffff; border-radius: 20px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06); border: 1px solid #e2e8f0; }
+    .header { background: linear-gradient(135deg, #10B981 0%, #059669 100%); padding: 32px 24px; text-align: center; color: #ffffff; }
+    .header h1 { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+    .content { padding: 32px 28px; text-align: right; }
+    .greeting { font-size: 16px; font-weight: bold; margin-bottom: 12px; color: #0f172a; }
+    .text { font-size: 14px; line-height: 1.7; color: #475569; margin-bottom: 24px; }
+    .otp-box { background: #f1f5f9; border: 2px dashed #10B981; border-radius: 16px; padding: 20px; text-align: center; margin: 24px 0; }
+    .otp-code { font-size: 36px; font-weight: 900; letter-spacing: 8px; color: #059669; font-family: 'Courier New', Courier, monospace; }
+    .note { font-size: 12px; color: #64748b; text-align: center; margin-top: 10px; }
+    .warning { background: #fef2f2; border-right: 4px solid #ef4444; padding: 12px 16px; border-radius: 8px; font-size: 12px; color: #991b1b; margin-top: 24px; line-height: 1.5; }
+    .footer { text-align: center; padding: 20px; font-size: 12px; color: #94a3b8; border-top: 1px solid #f1f5f9; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="header">
+      <h1>مصروفاتي</h1>
+      <p style="margin: 6px 0 0 0; opacity: 0.9; font-size: 14px;">تأكيد البريد الإلكتروني</p>
+    </div>
+    <div class="content">
+      <div class="greeting">مرحباً $cleanName 👋</div>
+      <div class="text">
+        سعداء بانضمامك إلينا! يرجى استخدام رمز التحقق السري (OTP) التالي لتأكيد بريدك الإلكتروني وإكمال إنشاء حسابك:
+      </div>
+      <div class="otp-box">
+        <div class="otp-code">$code</div>
+        <div class="note">⏳ صلاحية هذا الرمز لمدة 10 دقائق فقط</div>
+      </div>
+      <div class="warning">
+        🔒 <strong>تنبيه أمان:</strong> لا تشارك هذا الرمز مع أي شخص. فريق تطبيق "مصروفاتي" لن يطلب منك هذا الرمز أبداً.
+      </div>
+    </div>
+    <div class="footer">
+      تطبيق مصروفاتي - لإدارة المصاريف والمدخرات الذكية
+    </div>
+  </div>
+</body>
+</html>
+''';
 
-    // Simulate network latency gracefully
-    await Future.delayed(const Duration(milliseconds: 600));
+    try {
+      final smtpServer = gmail(
+        EmailConfig.senderEmail,
+        EmailConfig.appPassword,
+      );
 
-    return OtpSendResult.success(code);
+      final message = Message()
+        ..from = Address(EmailConfig.senderEmail, EmailConfig.senderName)
+        ..recipients.add(cleanEmail)
+        ..subject = subject
+        ..text = plainBody
+        ..html = htmlBody;
+
+      debugPrint('[EmailOtpService] Dispatching real email via Gmail SMTP to $cleanEmail...');
+      await send(message, smtpServer).timeout(const Duration(seconds: 15));
+
+      _activeOtps[cleanEmail] = record;
+      _lastSentTimestamps[cleanEmail] = now;
+
+      debugPrint('[EmailOtpService] Successfully dispatched OTP email to $cleanEmail');
+      return OtpSendResult.success(code);
+    } on MailerException catch (e) {
+      debugPrint('[EmailOtpService] MailerException: ${e.message}');
+      for (var p in e.problems) {
+        debugPrint('[EmailOtpService] Problem: ${p.code}: ${p.msg}');
+      }
+      return OtpSendResult.failure(
+        'تعذر إرسال رسالة التحقق عبر البريد الإلكتروني: يرجى التأكد من صحة إعدادات Gmail SMTP وكلمة مرور التطبيقات (App Password).',
+      );
+    } catch (e) {
+      debugPrint('[EmailOtpService] Error sending email: $e');
+      return OtpSendResult.failure(
+        'حدث خطأ أثناء الاتصال بخادم البريد. يرجى التحقق من اتصال الإنترنت أو إعدادات البريد والمحاولة مجدداً.',
+      );
+    }
   }
 
   /// Verify entered OTP against active record
@@ -197,15 +275,6 @@ class EmailOtpService {
     // OTP is valid! Invalidate active code so it cannot be re-used
     _activeOtps.remove(cleanEmail);
     return OtpVerifyResult.success();
-  }
-
-  /// Retrieve the active code for development / test inspection
-  String? getActiveCodeForTesting(String email) {
-    final record = _activeOtps[email.trim().toLowerCase()];
-    if (record != null && !record.isExpired) {
-      return record.code;
-    }
-    return null;
   }
 
   /// Reset/clear memory state

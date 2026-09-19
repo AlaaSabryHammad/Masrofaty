@@ -111,6 +111,7 @@ class RecurringProvider extends ChangeNotifier {
   Future<void> deleteRecurring(String id) async {
     _items.removeWhere((i) => i.id == id);
     await _save();
+    await _storage.deleteSingleRecurring(id);
     notifyListeners();
   }
 

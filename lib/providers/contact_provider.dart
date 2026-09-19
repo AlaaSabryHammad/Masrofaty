@@ -148,6 +148,7 @@ class ContactProvider extends ChangeNotifier {
   Future<void> deleteContact(String id) async {
     _contacts.removeWhere((c) => c.id == id);
     await _saveContacts();
+    await _storage.deleteSingleContact(id);
     notifyListeners();
   }
 

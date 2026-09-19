@@ -254,13 +254,15 @@ class _DebtDetailSheetState extends State<DebtDetailSheet> {
     final debt = debts[debtIndex];
     final color = debt.isLent ? AppColors.debtLent : AppColors.debtBorrowed;
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.9,
-      decoration: BoxDecoration(
-        color: isDark ? AppColors.darkCard : AppColors.lightSurface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+    return Material(
+      color: isDark ? AppColors.darkCard : AppColors.lightSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
       ),
-      child: Column(
+      clipBehavior: Clip.antiAlias,
+      child: SizedBox(
+        height: MediaQuery.of(context).size.height * 0.9,
+        child: Column(
         children: [
           // Handle
           Container(
@@ -660,6 +662,7 @@ class _DebtDetailSheetState extends State<DebtDetailSheet> {
               ),
             ),
         ],
+      ),
       ),
     );
   }

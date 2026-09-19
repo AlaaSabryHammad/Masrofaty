@@ -600,6 +600,7 @@ class _RecurringScreenState extends State<RecurringScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'fab_recurring',
         onPressed: () => _showAddEditDialog(),
         backgroundColor: AppColors.primary,
         icon: const Icon(Icons.add_rounded, color: Colors.white),

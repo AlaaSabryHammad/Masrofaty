@@ -14,6 +14,7 @@ import '../auth/login_screen.dart';
 import '../../providers/workspace_provider.dart';
 import '../dashboard/widgets/workspace_switcher_sheet.dart';
 import '../settings/widgets/saas_plans_sheet.dart';
+import '../widgets/user_avatar_widget.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -212,13 +213,9 @@ class ProfileScreen extends StatelessWidget {
                       ),
                       padding: const EdgeInsets.all(3),
                       child: ClipOval(
-                        child: Image.asset(
-                          profile.avatarPath,
-                          fit: BoxFit.cover,
-                          errorBuilder: (context, error, stackTrace) => Container(
-                            color: AppColors.primary,
-                            child: const Icon(Icons.person, size: 60, color: Colors.white),
-                          ),
+                        child: UserAvatarWidget(
+                          avatarPath: profile.avatarPath,
+                          size: 104,
                         ),
                       ),
                     ),
@@ -502,14 +499,15 @@ class ProfileScreen extends StatelessWidget {
           const SizedBox(height: 24),
 
           // User Info List Card
-          Container(
-            decoration: BoxDecoration(
-              color: isDark ? AppColors.darkCard : AppColors.lightCard,
+          Material(
+            color: isDark ? AppColors.darkCard : AppColors.lightCard,
+            shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(
+              side: BorderSide(
                 color: (isDark ? AppColors.darkBorder : AppColors.lightBorder).withValues(alpha: 0.6),
               ),
             ),
+            clipBehavior: Clip.antiAlias,
             child: Column(
               children: [
                 _buildInfoTile(
